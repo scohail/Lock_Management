@@ -1,0 +1,235 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HDFS-like File System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .section {
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .flash {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .flash.error { background-color: #ffebee; }
+        .flash.success { background-color: #e8f5e9; }
+        .file-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .file-table th, .file-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .file-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        button, .button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .read-button {
+            background-color: #2196F3;
+            color: white;
+        }
+        .edit-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .create-section {
+            margin-top: 20px;
+        }
+        .create-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 500px;
+        }
+        input, textarea {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .file-content {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>HDFS-like File System</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="container">
+        <div class="section">
+            <h2>Files in System</h2>
+            <table class="file-table">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Size (bytes)</th>
+                        <th>Last Modified</th>
+                        <th>Permissions</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                    <tr>
+                        <td>{{ file.name }}</td>
+                        <td>{{ file.size }}</td>
+                        <td>{{ file.modified }}</td>
+                        <td>{{ file.permissions }}</td>
+                        <td class="action-buttons">
+                            <button class="read-button" onclick="readFile('{{ file.name }}')">Read</button>
+                            <button class="Delete-button" onclick="deleteFile('{{ file.name }}')">Delete</button>
+                            <a href="{{ url_for('edit_file', filename=file.name) }}" class="button edit-button">Edit</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div id="file-content"></div>
+        </div>
+
+        <div class="section create-section">
+            <h2>Create New File</h2>
+            <form 
+                 class="create-form" action="{{ url_for('create_file') }}" method="POST" enctype="multipart/form-data">
+                <input type="text" name="filename" placeholder="Enter filename (e.g., example.txt)" required>
+                <textarea name="content" placeholder="Enter initial file content" rows="4" required></textarea>
+                <button type="submit" class="edit-button">Create File</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function readFile(filename) {
+            try {
+                const response = await fetch(`/read/${filename}`);
+                const data = await response.json();
+                const contentDiv = document.getElementById('file-content');
+                contentDiv.innerHTML = `
+                    <h3>Content of ${filename}:</h3>
+                    <div class="file-content">${data.content}</div>
+                `;
+            } catch (error) {
+                console.error('Error reading file:', error);
+            }
+        }
+    </script>
+
+    <script>
+        async function deleteFile(filename) {
+            try {
+                const response = await fetch(`/delete/${filename}`, {
+                    method: 'POST',
+                });
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert(`Error: ${error.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error}`);
+            }
+        }
+    </script>
+</body>
+</html>
+
+<!-- templates/edit.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit File - HDFS-like System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .edit-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        textarea {
+            min-height: 400px;
+            padding: 15px;
+            font-family: monospace;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .save-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .cancel-button {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Editing: {{ filename }}</h1>
+    
+    <form  class="edit-form" action="{{ url_for('update_file', filename=filename) }}" method="post">
+        <textarea name="content" required>{{ content }}</textarea>
+        <div class="buttons">
+            <button type="submit" class="save-button">Save Changes</button>
+            <a href="{{ url_for('index') }}"><button type="button" class="cancel-button">Cancel</button></a>
+        </div>
+    </form>
+</body>
+</html>
